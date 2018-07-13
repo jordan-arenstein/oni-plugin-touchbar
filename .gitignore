@@ -1,0 +1,7 @@
+
+.DS_Store
+.gitattributes
+*.sketch
+node_modules
+lib
+package-lock.json

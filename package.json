@@ -1,0 +1,24 @@
+{
+  "name": "oni-plugin-touchbar",
+  "version": "0.0.1",
+  "description": "A plugin for Oni which enables functionality for a macOS Touch Bar",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "engines": {
+    "oni": "^0.0.1"
+  },
+  "scripts": {},
+  "oni": {
+    "supportedFileTypes": [
+      "*"
+    ]
+  },
+  "dependencies": {
+    "electron": "^2.0.4",
+    "oni-api": "^0.0.46",
+    "oni-types": "^0.0.4",
+    "rimraf": "^2.6.2",
+    "typescript": "^2.9.2",
+    "vscode-languageserver-types": "^3.8.2"
+  }
+}
