@@ -96,6 +96,11 @@ export const activate = (oni: Oni.Plugin.Api) => {
 
   const formatButton = new TouchBarButton({
     icon: icons.format,
+    click: () => oni.commands.executeCommand("language.format"),
+  })
+
+  const prettierButton = new TouchBarButton({
+    icon: icons.format,
     click: () => oni.commands.executeCommand("autoformat.prettier"),
   })
 
@@ -142,21 +147,14 @@ export const activate = (oni: Oni.Plugin.Api) => {
   const buildTouchBar = async () => {
     let escapeItem = biggerEscButton
 
-    const sidebarActions = [
+    let items = []
+
+    let sidebarActions = [
       sidebarButton,
       explorerButton,
       searchButton,
       browserButton,
     ]
-    const languageActions = [renameButton, formatButton, definitionButton]
-    const browserActions = [
-      browserBackButton,
-      browserForwardButton,
-      browserDeveloperToolsButton,
-    ]
-    const debugActions = [recordButton, developerToolsButton, reloadButton]
-
-    let items = []
 
     items = [
       ...items,
@@ -165,11 +163,44 @@ export const activate = (oni: Oni.Plugin.Api) => {
     ]
 
     if (isBrowserBuffer()) {
+      let browserActions = [
+        browserBackButton,
+        browserForwardButton,
+        browserDeveloperToolsButton,
+      ]
       items = [...items, ...browserActions]
     } else {
+      let languageActions = []
+      const capabilities = await languageCapabilities()
+      if (capabilities) {
+        if (capabilities.renameProvider) {
+          languageActions = [...languageActions, renameButton]
+        }
+        if (capabilities.definitionProvider) {
+          languageActions = [...languageActions, definitionButton]
+        }
+        if (capabilities.formattingProvider) {
+          languageActions = [...languageActions, formatButton]
+        } else {
+          const prettier = await oni.plugins.getPlugin("oni-plugin-prettier")
+          if (
+            prettier.checkCompatibility &&
+            prettier.checkCompatibility(
+              oni.editors.activeEditor.activeBuffer.filePath
+            )
+          ) {
+            languageActions = [...languageActions, prettierButton]
+          }
+        }
+      }
       items = [...items, ...languageActions]
     }
 
+    let debugActions = [
+      // recordButton,
+      developerToolsButton,
+      reloadButton,
+    ]
     items = [
       ...items,
       new TouchBarSpacer({ size: "flexible" }),
