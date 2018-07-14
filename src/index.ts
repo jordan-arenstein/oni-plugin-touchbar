@@ -5,6 +5,9 @@ import * as Oni from "oni-api"
 import { join } from "path"
 
 interface Icons {
+  browser: Electron.nativeImage
+  browserBack: Electron.nativeImage
+  browserForward: Electron.nativeImage
   debug: Electron.nativeImage
   definition: Electron.nativeImage
   explorer: Electron.nativeImage
@@ -21,8 +24,10 @@ interface Icons {
 }
 export const activate = (oni: Oni.Plugin.Api) => {
   const shift = [0, 0, 0]
-  console.log(join(__dirname, "..", "icons/debug.png"))
   const icons: Icons = {
+    browser: nativeImage.createFromNamedImage("NSTouchBarOpenInBrowserTemplate", shift),
+    browserBack: nativeImage.createFromNamedImage("NSTouchBarGoBackTemplate", shift),
+    browserForward: nativeImage.createFromNamedImage("NSTouchBarGoForwardTemplate", shift),
     debug: nativeImage.createFromPath(join(__dirname, "..", "icons/debug.png")),
     definition: nativeImage.createFromPath(
       join(__dirname, "..", "icons/definition.png")
@@ -142,17 +147,60 @@ export const activate = (oni: Oni.Plugin.Api) => {
     },
   })
 
+  const browserButton = new TouchBarButton({
+    icon: icons.browser,
+    click: () => {
+      oni.commands.executeCommand("browser.openUrl")
+      // oni.editors.activeEditor.activeBuffer.getLayerById("oni.browser")
+    }
+  })
+
+  const browserBackButton = new TouchBarButton({
+    icon: icons.browserBack,
+    click: () => {
+      oni.commands.executeCommand("browser.goBack")
+    }
+  })
+
+  const browserForwardButton = new TouchBarButton({
+    icon: icons.browserForward,
+    click: () => {
+      oni.commands.executeCommand("browser.goForward")
+    }
+  })
+
+  const browserDeveloperToolsButton = new TouchBarButton({
+    icon: icons.debug,
+    click: () => {
+      oni.commands.executeCommand("browser.debug")
+    }
+  })
+
+  const isBrowserBuffer = (buffer: Oni.Buffer) => {
+    let browserFilePath = /\/Browser\d+$/
+    return browserFilePath.test(buffer.filePath)
+  }
+
   const buildTouchBar = async () => {
     let escapeItem = biggerEscButton
 
-    const sidebarActions = [sidebarButton, explorerButton, searchButton]
+    const sidebarActions = [sidebarButton, explorerButton, searchButton, browserButton]
     const languageActions = [renameButton, formatButton, definitionButton]
+    const browserActions = [browserBackButton, browserForwardButton, browserDeveloperToolsButton]
     const debugActions = [recordButton, developerToolsButton, reloadButton]
 
-    let items = [
+    let items = []
+    items = [...items,
       ...sidebarActions,
       new TouchBarSpacer({ size: "flexible" }),
-      ...languageActions,
+    ]
+    if (isBrowserBuffer(oni.editors.activeEditor.activeBuffer)) {
+      items = [ ...items, ...browserActions]
+    } else {
+      items = [ ...items, ...languageActions]
+    }
+
+    items = [...items,
       new TouchBarSpacer({ size: "flexible" }),
       ...debugActions,
     ]
@@ -166,4 +214,6 @@ export const activate = (oni: Oni.Plugin.Api) => {
   }
 
   buildTouchBar()
+
+  oni.editors.anyEditor.onBufferEnter.subscribe(buildTouchBar)
 }
