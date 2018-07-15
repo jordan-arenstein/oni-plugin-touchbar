@@ -8,11 +8,11 @@ type TouchBarActions =
   | "sidebar"
   | "interaction"
   | "debug"
-  | { label: string; command: ["nvim" | "oni", string] }[]
+  | { label: string; command: string; type: "nvim" | "oni" }[]
 
 interface TouchBarConfiguration {
   enabled: boolean
-  escapeItem: "bigger" | "close"
+  escapeItem: "bigger" | "close" | "browser"
   leftActions: TouchBarActions
   middleActions: TouchBarActions
   rightActions: TouchBarActions
@@ -189,12 +189,14 @@ export const activate = (oni: Oni.Plugin.Api) => {
         item = biggerEscButton
       } else if (configuration.escapeItem === "close") {
         item = closeButton
+      } else if (configuration.escapeItem === "browser") {
+        item = browserButton
       }
       return item
     }
 
     const sidebarActions = () => {
-      return [sidebarButton, explorerButton, searchButton, browserButton]
+      return [sidebarButton, explorerButton, searchButton]
     }
 
     const languageActions = async () => {
@@ -257,11 +259,11 @@ export const activate = (oni: Oni.Plugin.Api) => {
           ...buttons,
           ...actions.map(action => {
             let command = () => {}
-            if (action.command[0] === "nvim") {
+            if (action.type === "nvim") {
               command = () =>
-                oni.editors.activeEditor.neovim.command(action.command[1])
-            } else if (action.command[0] === "oni") {
-              command = () => oni.commands.executeCommand(action.command[1])
+                oni.editors.activeEditor.neovim.input(action.command)
+            } else if (action.type === "oni") {
+              command = () => oni.commands.executeCommand(action.command)
             }
             return new TouchBarButton({
               label: action.label,

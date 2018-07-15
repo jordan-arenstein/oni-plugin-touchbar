@@ -27,3 +27,20 @@ A custom configuration is passed to the plugin as an object through the "oni.plu
   rightActions: "debug",
 }
 ```
+
+### Configuration with Custom Commands
+```typescript
+{
+  enabled: true,
+  escapeItem: "bigger",
+  leftActions: null,
+  middleActions: [
+    { label: ":q", type: "nvim", command: "<esc>:q<enter>" },
+    { label: ":w", type: "nvim", command: "<esc>:w<enter>" },
+    { label: ":sp", type: "nvim", command: "<esc>:sp<enter>" },
+    { label: "new Oni window", type: "oni", command: "oni.process.openWindow" },
+    { label: "open folder", type: "oni", command: "workspace.openFolder" },
+  ],
+  rightActions: null,
+},
+```
