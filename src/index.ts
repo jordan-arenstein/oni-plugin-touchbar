@@ -4,7 +4,21 @@ const { TouchBarButton, TouchBarLabel, TouchBarSpacer } = TouchBar
 import * as Oni from "oni-api"
 import * as path from "path"
 
-const namedImage = (name: String): Electron.nativeImage => {
+type TouchBarActions =
+  | "sidebar"
+  | "interaction"
+  | "debug"
+  | { label: string; command: ["nvim" | "oni", string] }[]
+
+interface TouchBarConfiguration {
+  enabled: boolean
+  escapeItem: "bigger" | "close"
+  leftActions: TouchBarActions
+  middleActions: TouchBarActions
+  rightActions: TouchBarActions
+}
+
+const namedImage = (name: string): Electron.nativeImage => {
   const image: Electron.nativeImage = nativeImage.createFromNamedImage(
     `NSTouchBar${name}Template`,
     null
@@ -13,7 +27,7 @@ const namedImage = (name: String): Electron.nativeImage => {
   return image
 }
 
-const localImage = (name: String): Electron.nativeImage => {
+const localImage = (name: string): Electron.nativeImage => {
   const image: Electron.nativeImage = nativeImage.createFromPath(
     path.join(__dirname, "..", `icons/${name}.png`)
   )
@@ -25,6 +39,7 @@ const icons = {
   browser: namedImage("OpenInBrowser"),
   browserBack: namedImage("GoBack"),
   browserForward: namedImage("GoForward"),
+  close: localImage("Close"),
   debug: localImage("Debug"),
   definition: localImage("Definition"),
   explorer: localImage("Explorer"),
@@ -44,6 +59,11 @@ export const activate = (oni: Oni.Plugin.Api) => {
   const biggerEscButton = new TouchBarButton({
     label: "escape",
     click: () => oni.editors.activeEditor.neovim.input("<esc>"),
+  })
+
+  const closeButton = new TouchBarButton({
+    icon: icons.close,
+    click: () => oni.editors.activeEditor.neovim.command("wq"),
   })
 
   // sidebar commands
@@ -144,71 +164,124 @@ export const activate = (oni: Oni.Plugin.Api) => {
     return oni.language.getCapabilitiesForLanguage(language)
   }
 
+  // configuration
+  let defaults: TouchBarConfiguration = {
+    enabled: true,
+    escapeItem: "bigger",
+    leftActions: "sidebar",
+    middleActions: "interaction",
+    rightActions: "debug",
+  }
+
   const buildTouchBar = async () => {
-    let escapeItem = biggerEscButton
+    let configuration: TouchBarConfiguration = {
+      ...defaults,
+      ...oni.configuration.getValue("oni.plugins.touchbar", {}),
+    }
+    if (!configuration.enabled) {
+      remote.getCurrentWindow().setTouchBar(null)
+      return
+    }
 
-    let items = []
+    const escapeItem = () => {
+      let item = null
+      if (configuration.escapeItem === "bigger") {
+        item = biggerEscButton
+      } else if (configuration.escapeItem === "close") {
+        item = closeButton
+      }
+      return item
+    }
 
-    let sidebarActions = [
-      sidebarButton,
-      explorerButton,
-      searchButton,
-      browserButton,
-    ]
+    const sidebarActions = () => {
+      return [sidebarButton, explorerButton, searchButton, browserButton]
+    }
 
-    items = [
-      ...items,
-      ...sidebarActions,
-      new TouchBarSpacer({ size: "flexible" }),
-    ]
-
-    if (isBrowserBuffer()) {
-      let browserActions = [
-        browserBackButton,
-        browserForwardButton,
-        browserDeveloperToolsButton,
-      ]
-      items = [...items, ...browserActions]
-    } else {
-      let languageActions = []
-      const capabilities = await languageCapabilities()
-      if (capabilities) {
-        if (capabilities.renameProvider) {
-          languageActions = [...languageActions, renameButton]
-        }
-        if (capabilities.definitionProvider) {
-          languageActions = [...languageActions, definitionButton]
-        }
-        if (capabilities.formattingProvider) {
-          languageActions = [...languageActions, formatButton]
-        } else {
-          const prettier = await oni.plugins.getPlugin("oni-plugin-prettier")
-          if (
-            prettier.checkCompatibility &&
-            prettier.checkCompatibility(
-              oni.editors.activeEditor.activeBuffer.filePath
-            )
-          ) {
-            languageActions = [...languageActions, prettierButton]
+    const languageActions = async () => {
+      let actions = []
+      if (isBrowserBuffer()) {
+        actions = [
+          browserBackButton,
+          browserForwardButton,
+          browserDeveloperToolsButton,
+        ]
+      } else {
+        const capabilities = await languageCapabilities()
+        if (capabilities) {
+          if (capabilities.renameProvider) {
+            actions = [...actions, renameButton]
+          }
+          if (capabilities.definitionProvider) {
+            actions = [...actions, definitionButton]
+          }
+          if (capabilities.formattingProvider) {
+            actions = [...actions, formatButton]
+          } else {
+            // if no language server is available, check if prettier can work
+            const prettier = await oni.plugins.getPlugin("oni-plugin-prettier")
+            if (
+              prettier.checkCompatibility &&
+              prettier.checkCompatibility(
+                oni.editors.activeEditor.activeBuffer.filePath
+              )
+            ) {
+              actions = [...actions, prettierButton]
+            }
           }
         }
       }
-      items = [...items, ...languageActions]
+      return actions
     }
 
-    let debugActions = [
-      // recordButton,
-      developerToolsButton,
-      reloadButton,
-    ]
-    items = [
-      ...items,
-      new TouchBarSpacer({ size: "flexible" }),
-      ...debugActions,
-    ]
+    const debugActions = () => {
+      let actions = [
+        // recordButton,
+        developerToolsButton,
+        reloadButton,
+      ]
+      return actions
+    }
 
+    const parseConfigurationActions = async (
+      actions: TouchBarActions
+    ): Promise<Electron.TouchBarButton[]> => {
+      let buttons = []
+      if (actions === "sidebar") {
+        buttons = [...buttons, ...sidebarActions()]
+      } else if (actions === "interaction") {
+        buttons = [...buttons, ...(await languageActions())]
+      } else if (actions === "debug") {
+        buttons = [...buttons, ...debugActions()]
+      } else if (actions) {
+        buttons = [
+          ...buttons,
+          ...actions.map(action => {
+            let command = () => {}
+            if (action.command[0] === "nvim") {
+              command = () =>
+                oni.editors.activeEditor.neovim.command(action.command[1])
+            } else if (action.command[0] === "oni") {
+              command = () => oni.commands.executeCommand(action.command[1])
+            }
+            return new TouchBarButton({
+              label: action.label,
+              click: command,
+            })
+          }),
+        ]
+      }
+      return buttons
+    }
+
+    let items = [
+      ...(await parseConfigurationActions(configuration.leftActions)),
+      new TouchBarSpacer({ size: "flexible" }),
+      ...(await parseConfigurationActions(configuration.middleActions)),
+      new TouchBarSpacer({ size: "flexible" }),
+      ...(await parseConfigurationActions(configuration.rightActions)),
+    ]
     let touchBar = new TouchBar({
-      escapeItem: escapeItem,
+      escapeItem: escapeItem(),
       items: items,
     })
 
@@ -217,5 +290,7 @@ export const activate = (oni: Oni.Plugin.Api) => {
 
   buildTouchBar()
 
-  oni.editors.anyEditor.onBufferEnter.subscribe(buildTouchBar)
+  oni.editors.anyEditor.onBufferEnter.subscribe(buildTouchBar) // to detect changes if browser
+  oni.editors.anyEditor.onBufferSaved.subscribe(buildTouchBar) // to detect changes in filetype
+  oni.configuration.onConfigurationChanged.subscribe(buildTouchBar) // to update configuration
 }
