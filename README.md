@@ -13,7 +13,7 @@ A custom configuration is passed to the plugin as an object through the "oni.plu
 * `leftActions`, `middleActions`, and `rightActions` each describe the commands in the respective sections of the Touch Bar
   * `"sidebar"` shows commands which toggle panes in the Oni sidebar. These are restricted to the file explorer and search (for now).
   * `"interaction"` shows commands which interact with the current buffer, through commands defined by a language server. If the current language has no language server, this will be blank. If the current buffer is a browser, this will show browser commands.
-  `"debug"` shows commands which help when working on Oni itself.
+  * `"debug"` shows commands which help when working on Oni itself.
   * this can also be a list of custom actions, defined as `{ label: string, type: "nvim" | "oni", command: string }[]`
 
 ### Default Configuration
