@@ -7,7 +7,9 @@
   "engines": {
     "oni": "^0.0.1"
   },
-  "scripts": {},
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
   "oni": {
     "supportedFileTypes": [
       "*"
